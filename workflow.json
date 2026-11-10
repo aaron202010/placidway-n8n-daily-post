@@ -1,0 +1,1919 @@
+{
+  "name": "PlacidWay daily FB post (assessment)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1. Trigger\nDaily 09:00 Asia/Manila, the Manual button, or a key-protected webhook for tests (can override review/publish mode).\n\n**Config** holds every switch: `review_mode` auto|approval, `publish_mode` simulation|live, page id, models, rotation.",
+        "height": 860,
+        "width": 520,
+        "color": 5
+      },
+      "id": "600b0085-f8f2-544b-955a-e3916edb1e78",
+      "name": "Note: triggers",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Extract (polite)\nrobots.txt first, every URL checked against it. One request at a time, >= Crawl-delay (3 s) apart, plain bot User-Agent.\nSitemap of today's content type (Mon article, Tue package, Wed Q&A, Thu article, Fri news, Sat package, Sun Q&A) -> newest URL not in **pw_posted_urls** -> page -> title, summary, body, og:image.\nIf PlacidWay answers 403 (Cloudflare blocks datacenter IPs), it reads the Internet Archive copy instead and logs that.",
+        "height": 860,
+        "width": 1040,
+        "color": 4
+      },
+      "id": "7d9749e1-5962-5205-9938-b92e5dc43994",
+      "name": "Note: extract",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        460,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Generate + guardrails\nHaiku writes JSON (hook, 2-4 lines, CTA, hashtags); code adds the link, so the URL can never be invented.\nGuardrail 1: rules (length, structure, banned claim words, every number/price must exist in the source).\nGuardrail 2: Sonnet reads draft vs source as a compliance reviewer.\nBoth must pass. One rewrite with the issues as feedback, then block + alert.",
+        "height": 860,
+        "width": 1560,
+        "color": 6
+      },
+      "id": "b11f0d03-a742-5cce-891d-8d4973ea51ab",
+      "name": "Note: generate",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1510,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Review option + publish\n`review_mode = approval`: draft goes to Discord with Approve / Reject links that resume this run (Wait node, 24 h limit, bots ignored).\n`publish_mode = simulation` logs the exact Graph API request; `live` posts to the TEST page (photo post when an image exists, else link post). Optional scheduling.",
+        "height": 1060,
+        "width": 1480,
+        "color": 3
+      },
+      "id": "4f9a7096-63a2-59a7-bb98-43e152047044",
+      "name": "Note: review",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3230,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Log + notify\nOne exit for every outcome. Row in **pw_run_log** (item, post text, checks, FB post id, status), URL remembered in **pw_posted_urls**, one Discord line.",
+        "height": 860,
+        "width": 760,
+        "color": 4
+      },
+      "id": "40e517c3-0496-5bdb-8d38-92825fa912fe",
+      "name": "Note: log",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5700,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Failures never pass silently\nSite, LLM and Discord nodes retry (HTTP: 3 tries, 5 s apart; site fetch: only 429/5xx/network, growing backoff) then route their **error output** here. Facebook publish is a non-idempotent POST: no retry on 4xx, one retry only on network error/5xx. The Error Trigger catches anything else. -> alert in Discord + failure row in the log.",
+        "height": 520,
+        "width": 820,
+        "color": 2
+      },
+      "id": "47a57c65-cd85-5cb1-a204-f55e1dd208e6",
+      "name": "Note: errors",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Stretch: dashboard\nGET /webhook/placidway-assessment/dashboard?k=KEY renders the run log as an HTML table. Wrong or missing key = 401.",
+        "height": 300,
+        "width": 1100,
+        "color": 7
+      },
+      "id": "b5ec27f9-55a5-5de0-9d55-12432285678e",
+      "name": "Note: dashboard",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        1180
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "0675c166-0b28-586d-aa38-8fc1cab18823",
+      "name": "Daily 09:00 (Asia/Manila)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        60
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b5eb6c2c-014a-5e6d-b2e3-8396c5b62a71",
+      "name": "Manual run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "placidway-assessment/run",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "2ddc72c7-57f7-5a21-86dc-ef8b4faa977e",
+      "name": "Test run (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        460
+      ],
+      "webhookId": "e19b0f82-fb04-56f9-8eb3-156a3b93b160",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - run webhook key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONFIG: the one place to change behaviour. Webhook test runs may override a few keys (whitelisted below).\nconst DEFAULTS = {\n  review_mode: 'auto',            // 'auto' = publish straight away | 'approval' = send draft to a reviewer first\n  publish_mode: 'live',     // 'simulation' = log the exact Graph API request, post nothing | 'live' = post to the TEST page\n  fb_page_id: '1464168450123200', // a Facebook Page you own (never a PlacidWay page)\n  fb_graph_version: 'v27.0',          // version used in Meta's Pages API docs, checked 2026-11-10\n  schedule_minutes_ahead: 0,      // 0 = publish now; 15 to 43200 (30 days, Meta's limit) = schedule on Facebook\n  site: 'https://www.placidway.com',\n  user_agent: 'PlacidWayAssessmentBot/1.0 (take-home demo; one post per day; respects robots.txt)',\n  min_delay_ms: 1000,             // brief: max 1 request per second. robots.txt Crawl-delay wins if larger (3 s today).\n  archive_fallback: true,         // if PlacidWay refuses us (e.g. Cloudflare 403), read the Internet Archive copy instead\n  sitemaps: {                     // child sitemaps listed in https://www.placidway.com/sitemap.xml\n    article: '/1/sitemap_articles.xml',\n    package: '/1/sitemap_packages.xml',\n    answer: '/sitemap/1/sitemap_answers.xml',\n    news: '/1/sitemap_news.xml',\n  },\n  // Variety rule (stretch goal): a different content type each weekday, Asia/Manila time.\n  rotation: { Mon: 'article', Tue: 'package', Wed: 'answer', Thu: 'article', Fri: 'news', Sat: 'package', Sun: 'answer' },\n  draft_model: 'claude-haiku-5-5',\n  checker_model: 'claude-sonnet-5-5',\n  max_attempts: 2,                // first draft + one rewrite with the checker's feedback\n  approval_timeout_hours: 24,\n  n8n_base_url: 'https://YOUR-N8N-HOST',\n};\n\nconst item = $input.first().json;\nlet trigger = 'manual';\nlet overrides = {};\nif (item.body !== undefined && item.headers !== undefined) { trigger = 'webhook'; overrides = item.body || {}; }\nelse if (item.timestamp || item['Readable date']) trigger = 'schedule';\n\nconst cfg = { ...DEFAULTS };\nconst allowed = {\n  review_mode: ['auto', 'approval'],\n  publish_mode: ['simulation', 'live'],\n  content_type: Object.keys(DEFAULTS.sitemaps),\n  archive_fallback: [true, false],\n};\nfor (const [k, vals] of Object.entries(allowed)) {\n  if (overrides[k] !== undefined) {\n    if (!vals.includes(overrides[k])) throw new Error(`Config override ${k}=${overrides[k]} is not one of ${vals.join(', ')}`);\n    cfg[k] = overrides[k];\n  }\n}\n// Test hooks (webhook only): force a specific page, or inject a bad first draft to demonstrate the guardrails.\nconst test = {\n  override_url: typeof overrides.override_url === 'string' ? overrides.override_url : null,\n  test_draft: overrides.test_draft && typeof overrides.test_draft === 'object' ? overrides.test_draft : null,\n};\nif (test.override_url && !test.override_url.startsWith(cfg.site + '/')) throw new Error('override_url must be a PlacidWay URL');\n\nconst weekday = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila', weekday: 'short' });\ncfg.content_type = cfg.content_type || cfg.rotation[weekday] || 'article';\n\nreturn [{ json: { run_id: String($execution.id), started_at: new Date().toISOString(), trigger, weekday, cfg, test } }];\n"
+      },
+      "id": "296acde6-3c65-5f5c-a384-e481f5590870",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- polite fetch helpers (same block in each fetching node) ----\nconst helpers = this.helpers;\nconst sleep = (ms) => new Promise((r) => setTimeout(r, ms));\nconst lastHit = {}; // host -> time of our last request; seeded from the previous node so the gap holds across nodes\nconst reqLog = []; // every request with its UTC time, carried to the end of the run as proof of the gap\nasync function politeGet(url, cfg, delayMs, opts = {}) {\n  // One request at a time, at least delayMs apart per host. Retries only what is worth retrying:\n  // network errors, timeouts, 429 and 5xx, with growing backoff. 403/404 are answers, not glitches: no retry.\n  const host = (url.match(/^https?:\\/\\/([^/?#]+)/i) || [, url])[1];\n  const attempts = opts.attempts || 3;\n  let last = null;\n  for (let i = 1; i <= attempts; i++) {\n    const wait = (lastHit[host] || 0) + delayMs - Date.now();\n    if (wait > 0) await sleep(wait);\n    lastHit[host] = Date.now();\n    reqLog.push({ at: new Date(lastHit[host]).toISOString(), host, path: url.replace(/^https?:\\/\\/[^/]+/, '').slice(0, 60) });\n    try {\n      const res = await helpers.httpRequest({\n        url, method: 'GET', returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 30000, json: false,\n        headers: { 'User-Agent': cfg.user_agent, Accept: opts.accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },\n      });\n      const status = res.statusCode;\n      const b = res.body;\n      const body = typeof b === 'string' ? b : (b && typeof b.readUInt8 === 'function') ? b.toString('utf8') : JSON.stringify(b ?? '');\n      last = { url, status, body, attempts: i };\n      if (status === 429 || status >= 500) { await sleep(delayMs * i * 2); continue; }\n      return last;\n    } catch (e) {\n      last = { url, status: 0, body: '', error: e.message, attempts: i };\n      await sleep(delayMs * i * 2);\n    }\n  }\n  return last;\n}\nfunction waybackStamp() { return new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14); }\nconst seedClock = (st) => { Object.assign(lastHit, st.fetch_clock || {}); reqLog.push(...(st.req_log || [])); };\nconst carryClock = () => ({ fetch_clock: lastHit, req_log: reqLog });\n// ---- end helpers ----\n// Step 1: read robots.txt before anything else and keep its rules for every later request.\nconst s = $input.first().json;\nconst cfg = s.cfg;\nconst res = await politeGet(cfg.site + '/robots.txt', cfg, cfg.min_delay_ms, { accept: 'text/plain' });\nif (!res || res.status !== 200 || !/user-agent/i.test(res.body)) {\n  throw new Error(`[site] robots.txt not readable (HTTP ${res && res.status}${res && res.error ? ', ' + res.error.replace(/:/g, ' ') : ''}). Not crawling without it.`);\n}\nfunction parseRobots(txt, agent) {\n  const groups = []; let cur = null; let lastWasUA = false;\n  for (const raw of txt.split(/\\r?\\n/)) {\n    const l = raw.replace(/#.*/, '').trim();\n    const m = l.match(/^([A-Za-z-]+)\\s*:\\s*(.*)$/); if (!m) continue;\n    const k = m[1].toLowerCase(), v = m[2].trim();\n    if (k === 'user-agent') { if (!cur || !lastWasUA) { cur = { agents: [], rules: [], delay: null }; groups.push(cur); } cur.agents.push(v.toLowerCase()); lastWasUA = true; continue; }\n    lastWasUA = false; if (!cur) continue;\n    if ((k === 'allow' || k === 'disallow') && v) cur.rules.push({ type: k, path: v });\n    else if (k === 'crawl-delay') cur.delay = parseFloat(v);\n  }\n  const token = agent.toLowerCase();\n  const g = groups.find((g) => g.agents.some((a) => a !== '*' && token.includes(a))) || groups.find((g) => g.agents.includes('*'));\n  return g ? { rules: g.rules, crawl_delay_s: g.delay } : { rules: [], crawl_delay_s: null };\n}\nconst parsed = parseRobots(res.body, 'PlacidWayAssessmentBot');\nconst delay_ms = Math.max(cfg.min_delay_ms, (parsed.crawl_delay_s || 0) * 1000);\nreturn [{ json: { ...s, ...carryClock(), robots: { rules: parsed.rules, crawl_delay_s: parsed.crawl_delay_s, delay_ms, rule_count: parsed.rules.length } } }];\n"
+      },
+      "id": "6131f38c-cc6c-5de5-b586-6f74c40eb822",
+      "name": "Read robots.txt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        260
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_ID_OF_pw_posted_urls",
+          "cachedResultName": "pw_posted_urls"
+        },
+        "returnAll": true
+      },
+      "id": "e5119267-3e46-5c07-9531-d74575dd4c35",
+      "name": "Get used URLs",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        260
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- polite fetch helpers (same block in each fetching node) ----\nconst helpers = this.helpers;\nconst sleep = (ms) => new Promise((r) => setTimeout(r, ms));\nconst lastHit = {}; // host -> time of our last request; seeded from the previous node so the gap holds across nodes\nconst reqLog = []; // every request with its UTC time, carried to the end of the run as proof of the gap\nasync function politeGet(url, cfg, delayMs, opts = {}) {\n  // One request at a time, at least delayMs apart per host. Retries only what is worth retrying:\n  // network errors, timeouts, 429 and 5xx, with growing backoff. 403/404 are answers, not glitches: no retry.\n  const host = (url.match(/^https?:\\/\\/([^/?#]+)/i) || [, url])[1];\n  const attempts = opts.attempts || 3;\n  let last = null;\n  for (let i = 1; i <= attempts; i++) {\n    const wait = (lastHit[host] || 0) + delayMs - Date.now();\n    if (wait > 0) await sleep(wait);\n    lastHit[host] = Date.now();\n    reqLog.push({ at: new Date(lastHit[host]).toISOString(), host, path: url.replace(/^https?:\\/\\/[^/]+/, '').slice(0, 60) });\n    try {\n      const res = await helpers.httpRequest({\n        url, method: 'GET', returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 30000, json: false,\n        headers: { 'User-Agent': cfg.user_agent, Accept: opts.accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },\n      });\n      const status = res.statusCode;\n      const b = res.body;\n      const body = typeof b === 'string' ? b : (b && typeof b.readUInt8 === 'function') ? b.toString('utf8') : JSON.stringify(b ?? '');\n      last = { url, status, body, attempts: i };\n      if (status === 429 || status >= 500) { await sleep(delayMs * i * 2); continue; }\n      return last;\n    } catch (e) {\n      last = { url, status: 0, body: '', error: e.message, attempts: i };\n      await sleep(delayMs * i * 2);\n    }\n  }\n  return last;\n}\nfunction waybackStamp() { return new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14); }\nconst seedClock = (st) => { Object.assign(lastHit, st.fetch_clock || {}); reqLog.push(...(st.req_log || [])); };\nconst carryClock = () => ({ fetch_clock: lastHit, req_log: reqLog });\n// ---- end helpers ----\nfunction robotsAllows(rules, path) {\n  // Longest matching rule wins; Allow wins a tie (Google / RFC 9309 behaviour). Supports * and $.\n  let best = null;\n  for (const r of rules) {\n    let p = r.path; const anchored = p.endsWith('$'); if (anchored) p = p.slice(0, -1);\n    const re = new RegExp('^' + p.split('*').map((x) => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + (anchored ? '$' : ''));\n    if (re.test(path) && (!best || r.path.length > best.path.length || (r.path.length === best.path.length && r.type === 'allow'))) best = r;\n  }\n  return !best || best.type === 'allow';\n}\n// Step 2: read today's sitemap, drop anything robots.txt disallows or we already used, rank newest first.\nconst bare = (u) => u.replace(/^https?:\\/\\//, ''); // n8n cuts an error message at its first colon, so no scheme in messages\nconst pathOf = (u) => (u.match(/^https?:\\/\\/[^/?#]+([^?#]*)/i) || [, '/'])[1] || '/';\nconst s = $('Read robots.txt').first().json;\nconst cfg = s.cfg;\nseedClock(s); // continue the 3 s clock started by the robots.txt fetch\nconst used = new Set($input.all().map((i) => i.json.url).filter(Boolean));\nconst delay = s.robots.delay_ms;\nlet source = 'live', live_status = null, xml = null, candidates = [];\n\nif (s.test.override_url) {\n  const u = s.test.override_url;\n  if (!robotsAllows(s.robots.rules, pathOf(u))) throw new Error(`[robots] ${bare(u)} is disallowed by robots.txt. Not fetching it.`);\n  if (used.has(u)) throw new Error(`[select] ${bare(u)} was already used on an earlier run. Never posting the same URL twice.`);\n  candidates = [{ url: u, id: 0, lastmod: null, sitemap_image: null }];\n} else {\n  const path = cfg.sitemaps[cfg.content_type];\n  if (!robotsAllows(s.robots.rules, path)) throw new Error(`[robots] sitemap ${path} is disallowed by robots.txt`);\n  const live = await politeGet(cfg.site + path, cfg, delay, { accept: 'application/xml,text/xml' });\n  live_status = live.status;\n  if (live.status === 200 && live.body.includes('<urlset')) xml = live.body;\n  else if (cfg.archive_fallback) {\n    source = 'archive';\n    const arc = await politeGet(`https://web.archive.org/web/${waybackStamp()}id_/${cfg.site}${path}`, cfg, 1100, { accept: 'application/xml,text/xml' });\n    if (arc.status === 200 && arc.body.includes('<urlset')) xml = arc.body;\n    else throw new Error(`[site] sitemap unavailable (live HTTP ${live.status}${live.error ? ' ' + live.error.replace(/:/g, ' ') : ''}, archive HTTP ${arc.status})`);\n  } else throw new Error(`[site] sitemap unavailable (live HTTP ${live.status}${live.error ? ' ' + live.error.replace(/:/g, ' ') : ''}, archive fallback off)`);\n\n  for (const block of xml.split('<url>').slice(1)) {\n    const loc = (block.match(/<loc>\\s*([^<\\s]+)\\s*<\\/loc>/) || [])[1];\n    if (!loc) continue;\n    const pathname = pathOf(loc);\n    if (used.has(loc) || !robotsAllows(s.robots.rules, pathname)) continue;\n    const id = parseInt((pathname.match(/^\\/[a-z-]+\\/(\\d+)/) || [])[1] || '0', 10);\n    candidates.push({\n      url: loc, id,\n      lastmod: (block.match(/<lastmod>([^<]+)<\\/lastmod>/) || [])[1] || null,\n      sitemap_image: (block.match(/<image:loc>([^<]+)<\\/image:loc>/) || [])[1] || null,\n    });\n  }\n  // \"Newest first\": news has real lastmod dates; for the rest PlacidWay regenerates lastmod daily,\n  // so the numeric content id (auto-increment) is the honest recency signal.\n  candidates.sort((a, b) => (cfg.content_type === 'news' ? String(b.lastmod).localeCompare(String(a.lastmod)) : 0) || b.id - a.id);\n}\nif (!candidates.length) throw new Error(`[select] no unused ${cfg.content_type} URL left in the sitemap`);\nreturn [{ json: { ...s, ...carryClock(), used_count: used.size, site_access: { sitemap_source: source, live_status }, shortlist: candidates.slice(0, 1000), candidate_total: candidates.length } }];\n"
+      },
+      "id": "3510e03e-389c-5e8f-a1a2-cf48e1d402bc",
+      "name": "Pick today's item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        260
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- polite fetch helpers (same block in each fetching node) ----\nconst helpers = this.helpers;\nconst sleep = (ms) => new Promise((r) => setTimeout(r, ms));\nconst lastHit = {}; // host -> time of our last request; seeded from the previous node so the gap holds across nodes\nconst reqLog = []; // every request with its UTC time, carried to the end of the run as proof of the gap\nasync function politeGet(url, cfg, delayMs, opts = {}) {\n  // One request at a time, at least delayMs apart per host. Retries only what is worth retrying:\n  // network errors, timeouts, 429 and 5xx, with growing backoff. 403/404 are answers, not glitches: no retry.\n  const host = (url.match(/^https?:\\/\\/([^/?#]+)/i) || [, url])[1];\n  const attempts = opts.attempts || 3;\n  let last = null;\n  for (let i = 1; i <= attempts; i++) {\n    const wait = (lastHit[host] || 0) + delayMs - Date.now();\n    if (wait > 0) await sleep(wait);\n    lastHit[host] = Date.now();\n    reqLog.push({ at: new Date(lastHit[host]).toISOString(), host, path: url.replace(/^https?:\\/\\/[^/]+/, '').slice(0, 60) });\n    try {\n      const res = await helpers.httpRequest({\n        url, method: 'GET', returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 30000, json: false,\n        headers: { 'User-Agent': cfg.user_agent, Accept: opts.accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },\n      });\n      const status = res.statusCode;\n      const b = res.body;\n      const body = typeof b === 'string' ? b : (b && typeof b.readUInt8 === 'function') ? b.toString('utf8') : JSON.stringify(b ?? '');\n      last = { url, status, body, attempts: i };\n      if (status === 429 || status >= 500) { await sleep(delayMs * i * 2); continue; }\n      return last;\n    } catch (e) {\n      last = { url, status: 0, body: '', error: e.message, attempts: i };\n      await sleep(delayMs * i * 2);\n    }\n  }\n  return last;\n}\nfunction waybackStamp() { return new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14); }\nconst seedClock = (st) => { Object.assign(lastHit, st.fetch_clock || {}); reqLog.push(...(st.req_log || [])); };\nconst carryClock = () => ({ fetch_clock: lastHit, req_log: reqLog });\n// ---- end helpers ----\n// Step 3: fetch the chosen page (newest unused first) and pull out title, summary, body text and featured image.\nconst s = $input.first().json;\nconst cfg = s.cfg;\nseedClock(s); // continue the clock from the sitemap fetch\n// Pure extraction function, shared logic for the n8n \"Extract article\" Code node.\n// Pure extraction function, shared logic for the n8n \"Extract article\" Code node.\nfunction decode(s) {\n  return s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '\"').replace(/&#0?39;|&apos;|&rsquo;|&lsquo;/g, \"'\")\n    .replace(/&ldquo;|&rdquo;/g, '\"').replace(/&ndash;|&mdash;/g, '-').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));\n}\nfunction meta(html, key) {\n  const re1 = new RegExp(`<meta[^>]+(?:property|name)=[\"']${key}[\"'][^>]*content=[\"']([^\"']*)[\"']`, 'i');\n  const re2 = new RegExp(`<meta[^>]+content=[\"']([^\"']*)[\"'][^>]*(?:property|name)=[\"']${key}[\"']`, 'i');\n  const m = html.match(re1) || html.match(re2);\n  return m ? decode(m[1]).trim() : '';\n}\nfunction extractPage(html, url) {\n  const out = { url };\n  const canon = (html.match(/<link[^>]+rel=[\"']canonical[\"'][^>]*href=[\"']([^\"']+)[\"']/i) || [])[1];\n  out.canonical_url = canon || url;\n  const h1 = html.match(/<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  out.title = (h1 ? decode(h1[1].replace(/<[^>]+>/g, '')).replace(/\\s+/g, ' ').trim() : '') || meta(html, 'og:title') ||\n    decode((html.match(/<title>([^<]*)<\\/title>/i) || [, ''])[1]).trim();\n  // Package pages show the package's own starting price in the first .actual-price block.\n  const price = html.match(/class=[\"']actual-price[\"'][^>]*>\\s*(?:<span[^>]*>)?\\s*([$€£₹₺][\\s\\d,.]+|\\d[\\d,.]*\\s?(?:USD|EUR|GBP))\\s*(?:<\\/span>)?\\s*(?:<span[^>]*>)?\\s*([^<]{0,40})/i);\n  out.listed_price = price ? decode(`${price[1].trim()} ${price[2].trim()}`).replace(/\\s+/g, ' ').trim() : null;\n  out.summary = meta(html, 'description') || meta(html, 'og:description');\n  out.image_url = meta(html, 'og:image') || meta(html, 'twitter:image') || null;\n  // Body: from the H1 to the first \"related / reviews / footer\" marker, tags stripped.\n  let body = html.replace(/<(script|style|noscript|svg|iframe|form|nav|header)[\\s\\S]*?<\\/\\1>/gi, ' ');\n  // Main content container used by PlacidWay article, package and Q&A templates; fall back to the H1.\n  let start = -1;\n  for (const marker of ['article-dt-desc', 'pack-inner-content']) { start = body.indexOf(marker); if (start >= 0) break; }\n  if (start < 0) start = h1 ? Math.max(0, body.indexOf(h1[0].slice(0, 40))) : 0;\n  body = body.slice(start);\n  const stops = ['related-packages-sec', 'pw-stat', '<footer', 'related-articles', 'Related Articles'];\n  let end = body.length;\n  for (const s of stops) { const i = body.indexOf(s, 200); if (i > 0 && i < end) end = i; }\n  body = body.slice(body.indexOf('>') + 1, end).replace(/<\\/(p|div|li|h[1-6]|br|tr)>/gi, '\\n').replace(/<br\\s*\\/?>/gi, '\\n').replace(/<[^>]+>/g, ' ');\n  body = decode(body).replace(/[ \\t ]+/g, ' ').replace(/\\s*\\n\\s*/g, '\\n').replace(/\\n{2,}/g, '\\n').trim();\n  out.body_text = body.slice(0, 7000);\n  out.body_chars = body.length;\n  out.ok = !!(out.title && out.body_text.length > 300 && !/page not found|404 error|Attention Required/i.test(out.title));\n  return out;\n}\nlet mode = s.site_access.sitemap_source === 'archive' ? 'archive' : 'live';\nconst tried = [];\nlet page = null;\n// Live: newest first, up to 5 pages. Archive: the newest pages are rarely archived yet, so walk down the\n// ranking in growing steps (ranks 0-4, 6, 9, 13 ... 900) and take the newest one the archive holds.\nconst RANKS = [0, 1, 2, 3, 4, 6, 9, 13, 18, 24, 31, 39, 48, 58, 70, 85, 100, 120, 145, 175, 210, 250, 300, 360, 430, 520, 620, 750, 900];\nlet liveTries = 0;\nfor (let r = 0; r < s.shortlist.length; r++) {\n  if (mode === 'live' && ++liveTries > 5) break;\n  if (mode === 'archive' && !RANKS.includes(r)) continue;\n  const c = s.shortlist[r];\n  let res = null, snapshot = null, source = mode;\n  if (mode === 'live') {\n    res = await politeGet(c.url, cfg, s.robots.delay_ms);\n    tried.push({ url: c.url, via: 'live', status: res.status });\n    if ((res.status === 403 || res.status === 0) && cfg.archive_fallback) { mode = 'archive'; source = 'archive'; res = null; }\n    else if (res.status !== 200) continue;\n  }\n  if (mode === 'archive') {\n    const av = await politeGet(`https://archive.org/wayback/available?url=${encodeURIComponent(c.url.replace(/^https?:\\/\\//, ''))}&timestamp=${waybackStamp()}`, cfg, 1100, { accept: 'application/json' });\n    let closest = null;\n    try { closest = JSON.parse(av.body).archived_snapshots.closest; } catch (e) {}\n    if (!closest || !closest.available) { tried.push({ url: c.url, via: 'archive', status: 'no snapshot' }); continue; }\n    snapshot = closest.timestamp;\n    res = await politeGet(`https://web.archive.org/web/${snapshot}id_/${c.url}`, cfg, 1100);\n    tried.push({ url: c.url, via: 'archive', status: res.status, snapshot });\n    if (res.status !== 200) continue;\n  }\n  const p = extractPage(res.body, c.url);\n  if (!p.ok) { tried[tried.length - 1].status = 'extract failed'; continue; }\n  // Prefer the original S3 image (no Cloudflare in front) so Facebook can always fetch it.\n  let img = p.image_url || c.sitemap_image || null;\n  if (img && img.includes('https://placidwaycdn.s3')) img = img.slice(img.indexOf('https://placidwaycdn.s3'));\n  page = { ...p, url: c.url, canonical_url: c.url, image_url: img, content_id: c.id, fetch_source: source, snapshot };\n  break;\n}\nif (!page) {\n  const summary = tried.reduce((m, t) => ((m[`${t.via} ${t.status}`] = (m[`${t.via} ${t.status}`] || 0) + 1), m), {});\n  throw new Error(`[site] could not read any of ${tried.length} candidate pages (${Object.entries(summary).map(([k, v]) => v + 'x ' + k).join(', ')})`);\n}\nconst { shortlist, ...rest } = s;\nreturn [{ json: { ...rest, ...carryClock(), page, fetch_log: tried } }];\n"
+      },
+      "id": "80563acb-ec14-5a79-bc23-97ffa25d1be2",
+      "name": "Fetch page + extract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        260
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4: build the drafting request. On a retry, the previous draft and every issue found go back in as feedback.\nconst s = $input.first().json;\nconst retry = !!s.guardrail;               // set by \"Combine verdicts\" when a draft failed\nconst attempt = retry ? s.attempt + 1 : 1;\nconst p = s.page;\nconst angle = {\n  article: 'Say what this guide explains and who it is for.',\n  package: 'Say what the package is, where it is offered and what the page lists. Use a price only if LISTED PRICE gives one, word for word.',\n  answer: 'Open with the patient question, then give the short answer exactly as the source states it.',\n  news: 'Share the announcement in plain words: who, what, where.',\n}[s.cfg.content_type] || 'Say what the page covers.';\n\nconst system = `You write one Facebook post for PlacidWay, a medical tourism marketplace, from ONE source page.\nReturn JSON only, no prose: {\"hook\": string, \"lines\": [2 to 4 strings], \"cta\": string, \"hashtags\": [3 to 5 strings]}\n\nFormat\n- hook: one short line, max 12 words. A question or a plain statement. No clickbait.\n- lines: 2 or 3 short lines, max 16 words each. Each is one concrete, useful point taken from the source.\n- cta: one line (max 14 words) that invites people to read the full guide, see the package details or ask PlacidWay. Do NOT write the URL; it is added automatically.\n- hashtags: 3 to 5, CamelCase words, no spaces, no '#', about the treatment, destination or medical travel.\n- hook + lines + cta together: under 400 characters. Plain, warm, professional. No emojis. No ALL CAPS.\n- Write as PlacidWay. Never write \"the source\" or \"the page says\"; \"this guide explains\" or \"the package lists\" is fine.\n\nHard rules (a second reviewer rejects the post if any is broken)\n1. Use only facts stated in the SOURCE. No outside knowledge: no names, numbers, dates, credentials, rankings or comparisons that are not in it.\n2. No medical claims: never say or imply a treatment cures, heals, fixes, reverses or is proven to work. No medical advice.\n3. No outcome promises: never tell the reader what result they will get (no \"get your life back\", \"pain-free\", \"permanent\", \"guaranteed\", \"life-changing\"). Describe what the page covers or what a package includes, not what it will do for the reader. Do not repeat outcome claims even if the source makes them.\n4. No success rates, survival rates or percentages.\n5. Prices: only a figure printed in the source, copied exactly (same currency, same number, \"starting from\" if the source says so). Otherwise no prices, savings or discounts.\nAngle for this content type: ${angle}`;\n\nlet user = `CONTENT TYPE: ${s.cfg.content_type}\nTITLE: ${p.title}\nMETA DESCRIPTION: ${p.summary || '(none)'}\nLISTED PRICE: ${p.listed_price || '(none)'}\nSOURCE TEXT:\n<<<\n${p.body_text}\n>>>`;\nif (retry) {\n  user += `\\n\\nYour previous draft was REJECTED.\\nPrevious draft:\\n${s.post_text}\\n\\nIssues to fix (fix every one, and do not add new claims):\\n` +\n    s.guardrail.issues.map((i, n) => `${n + 1}. [${i.type}] \"${i.quote || ''}\" - ${i.reason}`).join('\\n');\n}\nconst anthropic_body = { model: s.cfg.draft_model, max_tokens: 1000, thinking: { type: 'disabled' }, system, messages: [{ role: 'user', content: user }] };\nconst { guardrail, rule_check, llm_check, ...rest } = s;\nreturn [{ json: { ...rest, attempt, previous_issues: retry ? s.guardrail.issues : [], anthropic_body } }];\n"
+      },
+      "id": "9bc8832f-6f87-591b-92d2-b256b0c752a4",
+      "name": "Build draft request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.anthropic_body) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "ded23c1a-7984-5ace-91ad-ee31a6542674",
+      "name": "LLM: write post (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        260
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - Anthropic"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 5: turn the model's JSON into the final post. The link and the layout are added by code, never by the model,\n// so the URL can't be hallucinated and the structure is always hook / value lines / CTA / link / hashtags.\nconst s = $('Build draft request').item.json;\nconst resp = $input.first().json;\nlet raw = (resp.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\\n');\nlet used_test_draft = false;\nlet d = null;\nif (s.attempt === 1 && s.test && s.test.test_draft) { d = s.test.test_draft; used_test_draft = true; raw = JSON.stringify(d); }\nelse {\n  const a = raw.indexOf('{'), b = raw.lastIndexOf('}');\n  try { d = JSON.parse(raw.slice(a, b + 1)); } catch (e) { d = null; }\n}\nconst clean = (t) => String(t || '').replace(/\\s+/g, ' ').trim();\nconst draft = d ? {\n  hook: clean(d.hook),\n  lines: Array.isArray(d.lines) ? d.lines.map(clean).filter(Boolean) : [],\n  cta: clean(d.cta),\n  hashtags: Array.isArray(d.hashtags) ? d.hashtags.map((h) => '#' + clean(h).replace(/^#+/, '').replace(/\\s+/g, '')) : [],\n} : { hook: '', lines: [], cta: '', hashtags: [], parse_error: raw.slice(0, 300) };\n// Length is enforced by code, not trusted to the model: drop trailing value lines (never add text) until it fits.\nlet body = [draft.hook, '', ...draft.lines, '', draft.cta].join('\\n').trim();\nwhile (body.length >= 500 && draft.lines.length > 2) {\n  draft.trimmed = (draft.trimmed || 0) + 1;\n  draft.lines.pop();\n  body = [draft.hook, '', ...draft.lines, '', draft.cta].join('\\n').trim();\n}\nconst post_text = `${body}\\n\\n${s.page.canonical_url}\\n\\n${draft.hashtags.join(' ')}`;\nconst { anthropic_body, ...rest } = s;\nreturn [{ json: { ...rest, draft, post_text, pre_link_chars: body.length, used_test_draft,\n  draft_usage: resp.usage || null } }];\n"
+      },
+      "id": "ac000ab5-8157-5c4a-8bf5-916d65d193a2",
+      "name": "Parse draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Guardrail 1 of 2: deterministic rules. Cheap, explainable, never \"creative\". Catches the obvious every time.\nconst s = $input.first().json;\nconst d = s.draft;\nconst p = s.page;\nconst issues = [];\nconst add = (type, quote, reason) => issues.push({ type, quote, reason, by: 'rules' });\nconst textNoLink = [d.hook, ...d.lines, d.cta].join('\\n');\nconst source = [p.title, p.summary, p.listed_price, p.body_text].join('\\n');\nconst norm = (t) => t.toLowerCase().replace(/[’']/g, \"'\");\nconst srcN = norm(source);\n\n// 1. Structure and length (brief: hook, 2-4 lines, CTA, link, 3-5 hashtags, < 500 chars before the link)\nif (d.parse_error) add('format', '', 'model did not return valid JSON');\nif (!d.hook) add('format', '', 'missing hook');\nif (d.lines.length < 2 || d.lines.length > 4) add('format', '', `needs 2-4 value lines, got ${d.lines.length}`);\nif (!d.cta) add('format', '', 'missing call to action');\nif (d.hashtags.length < 3 || d.hashtags.length > 5) add('format', d.hashtags.join(' '), `needs 3-5 hashtags, got ${d.hashtags.length}`);\nfor (const h of d.hashtags) if (!/^#[A-Za-z][A-Za-z0-9]{1,40}$/.test(h)) add('format', h, 'hashtag must be letters/digits only');\nif (s.pre_link_chars >= 500) add('format', '', `text before the link is ${s.pre_link_chars} chars (limit 500)`);\nif (/https?:\\/\\//i.test(textNoLink)) add('format', '', 'the model wrote a URL itself; only the code adds the link');\nif (/[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/u.test(textNoLink)) add('format', '', 'emoji found (house style: none)');\n\n// 2. Medical claims and outcome promises (a word list a compliance person can read and extend)\nconst CLAIMS = [\n  [/\\bguarantee[sd]?\\b|\\bguaranteed\\b/i, 'outcome_promise'],\n  [/\\b100\\s?%/i, 'outcome_promise'],\n  [/\\brisk[- ]free\\b|\\bno risks?\\b|\\bzero risk\\b|\\bsafe and effective\\b|\\bno side[- ]effects\\b/i, 'outcome_promise'],\n  [/\\bpain[- ]free\\b|\\bpainless\\b/i, 'outcome_promise'],\n  [/\\bpermanent(ly)?\\b/i, 'outcome_promise'],\n  [/\\bmiracle\\b|\\blife[- ]changing\\b|\\btransform(s|ed|ative)? your\\b|\\bget your (life|confidence|body) back\\b/i, 'outcome_promise'],\n  [/\\binstant results?\\b|\\bperfect results?\\b|\\bbest results?\\b/i, 'outcome_promise'],\n  [/\\bcure[sd]?\\b|\\bcuring\\b/i, 'medical_claim'],\n  [/\\b(will|can|to)\\s+(heal|fix|reverse|eliminate|restore|regenerate)\\b/i, 'medical_claim'],\n  [/\\b(clinically )?proven\\b/i, 'medical_claim'],\n  [/\\b(success|survival|cure) rates?\\b/i, 'medical_claim'],\n];\nconst claimText = textNoLink + '\\n' + d.hashtags.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'); // #MiracleCure -> Miracle Cure\nfor (const [re, type] of CLAIMS) { const m = claimText.match(re); if (m) add(type, m[0], 'banned phrase for health ads (claim or promise)'); }\n\n// 3. Numbers and prices must appear in the source, character for character (commas ignored)\nconst nums = textNoLink.match(/(?:[$€£₹₺]|USD|EUR|GBP)\\s?\\d[\\d,]*(?:\\.\\d+)?|\\d[\\d,]*(?:\\.\\d+)?\\s?(?:%|percent)?/gi) || [];\nconst srcDigits = source.replace(/,/g, '');\nfor (const n of nums) {\n  const digits = (n.match(/\\d[\\d,]*(?:\\.\\d+)?/) || [''])[0].replace(/,/g, '');\n  if (!digits) continue;\n  const isMoney = /[$€£₹₺]|USD|EUR|GBP/i.test(n);\n  if (!new RegExp('(^|[^\\\\d])' + digits.replace('.', '\\\\.') + '([^\\\\d]|$)').test(srcDigits)) {\n    add(isMoney ? 'invented_price' : 'unsupported_fact', n.trim().replace(/[,.]$/, ''), 'number not found in the source page');\n  } else if (/%|percent/i.test(n)) add('medical_claim', n.trim(), 'percentages are not allowed in posts (rates and odds read as promises)');\n}\nif (/\\b(cheap(est)?|lowest price|save up to|discount|\\d+% off)\\b/i.test(textNoLink) && !/\\b(cheap|lowest|save|discount)/i.test(source)) add('invented_price', '', 'savings or discount wording not in the source');\n\n// 4. Superlatives and rankings only when the source says them\nfor (const w of ['best', 'top', 'leading', 'number one', '#1', 'world-class', 'world class', 'renowned', 'award-winning', 'most trusted']) {\n  const re = new RegExp('(^|[^a-z])' + w.replace(/[#-]/g, (c) => '\\\\' + c) + '([^a-z]|$)', 'i');\n  if (re.test(textNoLink) && !re.test(srcN)) add('unsupported_fact', w, 'superlative not used by the source page');\n}\nconst rule_check = { pass: issues.length === 0, issues };\nreturn [{ json: { ...s, rule_check } }];\n"
+      },
+      "id": "364f5a5e-f0a8-5bf7-8a4c-8a5e2b86a3b2",
+      "name": "Rule check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Guardrail 2 of 2: a second, stronger model reads the draft against the source like a compliance reviewer.\n// It catches what a word list can't: implied promises, paraphrased facts that aren't in the page, wrong context.\nconst s = $input.first().json;\nconst system = `You are a strict compliance reviewer for health and medical-travel social media posts.\nCompare the DRAFT with the SOURCE page. FAIL the draft if ANY of these is true:\n1 medical_claim: it states or implies a treatment cures, heals, fixes, reverses, or works; or it gives medical advice.\n2 outcome_promise: it promises or implies a result for the reader (e.g. \"walk without pain\", \"look younger\", \"get your confidence back\"), including softened forms (\"can help you finally...\", \"on the path to recovery\").\n3 invented_price: it mentions a price, cost, saving or discount that is not stated exactly in the source.\n4 unsupported_fact: it states any fact, number, name, credential, place, date, ranking or comparison that the source does not support.\nAllowed: saying what the page explains or covers, what a package includes, neutral facts quoted from the source, a question as a hook, an invitation to read more.\nThe link and hashtags are added by the system; judge hashtags only for claims.\nReturn JSON only: {\"verdict\":\"pass\"|\"fail\",\"issues\":[{\"type\":\"medical_claim|outcome_promise|invented_price|unsupported_fact\",\"quote\":\"exact words from the draft\",\"reason\":\"short\"}],\"notes\":\"one sentence\"}`;\nconst p = s.page;\nconst user = `SOURCE (title, description, listed price, page text):\nTITLE: ${p.title}\nDESCRIPTION: ${p.summary || '(none)'}\nLISTED PRICE: ${p.listed_price || '(none)'}\n<<<\n${p.body_text}\n>>>\n\nDRAFT POST:\n<<<\n${s.post_text}\n>>>`;\nreturn [{ json: { ...s, check_body: { model: s.cfg.checker_model, max_tokens: 4000, system, messages: [{ role: 'user', content: user }] } } }];\n"
+      },
+      "id": "9f18d534-8f5e-50ec-94de-53e44e634c89",
+      "name": "Build check request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.check_body) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "f80accb3-88ca-56de-87c5-a7a5dddd6c1b",
+      "name": "LLM: guardrail check (Sonnet)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2760,
+        260
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - Anthropic"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Both guardrails must pass. The LLM checker fails closed: an unreadable answer counts as a fail.\nconst s = $('Build check request').item.json;\nconst resp = $input.first().json;\nconst raw = (resp.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\\n');\nlet llm = null;\ntry { llm = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)); } catch (e) {}\nconst llm_check = llm && (llm.verdict === 'pass' || llm.verdict === 'fail')\n  ? { pass: llm.verdict === 'pass', issues: (llm.issues || []).map((i) => ({ ...i, by: 'llm' })), notes: llm.notes || '' }\n  : { pass: false, issues: [{ type: 'checker_error', quote: '', reason: 'checker reply was not valid JSON', by: 'llm' }], notes: raw.slice(0, 200) };\nconst pass = s.rule_check.pass && llm_check.pass;\nconst guardrail = { pass, issues: [...s.rule_check.issues, ...llm_check.issues] };\nconst history = [...(s.guardrail_history || []), { attempt: s.attempt, post_text: s.post_text, used_test_draft: s.used_test_draft, rule_check: s.rule_check, llm_check }];\nconst { check_body, ...rest } = s;\nreturn [{ json: { ...rest, llm_check, guardrail, guardrail_history: history, can_retry: !pass && s.attempt < s.cfg.max_attempts } }];\n"
+      },
+      "id": "c19e15e2-a00e-50b6-8c42-64ad27114677",
+      "name": "Combine verdicts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3000,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2f3ff468-2c18-52ad-a311-be5b6287f73e",
+              "leftValue": "={{ $json.guardrail.pass }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "5006dd3d-1074-5b87-82e3-aa73b55c9465",
+      "name": "Passed both guardrails?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3260,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dd106658-cdbd-5757-b921-ccb90b58deff",
+              "leftValue": "={{ $json.can_retry }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8deaa539-b39a-58e0-99cd-92d65a2e9658",
+      "name": "Rewrite allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3260,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2562ec09-508c-5209-8379-6fdb35f525e9",
+              "leftValue": "={{ $json.cfg.review_mode }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "approval"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "accb820d-626d-5532-9f52-fcf6ef4523fb",
+      "name": "Approval mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3500,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Approval mode: post the draft to the reviewer channel with Approve / Reject links that resume this exact run.\nconst s = $input.first().json;\nconst base = $execution.resumeUrl;\nconst sep = base.includes('?') ? '&' : '?';\nconst approve_url = `${base}${sep}action=approve`;\nconst reject_url = `${base}${sep}action=reject`;\n// <...> stops Discord from unfurling the links (an unfurl bot must never \"click\" Approve). The Wait node also ignores bots.\nconst quoted = s.post_text.split('\\n').map((l) => '> ' + l).join('\\n');\nlet content = `**PlacidWay post waiting for review** (run ${s.run_id}, ${s.cfg.content_type}, publish mode: ${s.cfg.publish_mode})\nSource: <${s.page.canonical_url}>\nImage: ${s.page.image_url ? '<' + s.page.image_url + '>' : 'none'}\nGuardrails: rules ${s.rule_check.pass ? 'pass' : 'fail'}, LLM check ${s.llm_check.pass ? 'pass' : 'fail'} (attempt ${s.attempt})\n\n${quoted}\n\nApprove: <${approve_url}>\nReject: <${reject_url}>\nExpires in ${s.cfg.approval_timeout_hours} h; no answer = not posted.`;\nif (content.length > 1990) content = content.slice(0, 1985) + '...';\nreturn [{ json: { ...s, approval: { approve_url, reject_url, sent_at: new Date().toISOString() }, discord_content: content } }];\n"
+      },
+      "id": "a8a6a79d-54d5-53ea-84a9-eaf7886e72d5",
+      "name": "Build approval message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{ $json.discord_content }}",
+        "options": {}
+      },
+      "id": "c6bdaa63-5211-586a-a78b-fc12bf0fd6f3",
+      "name": "Discord: send draft for approval",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        3980,
+        40
+      ],
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - Discord webhook"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": 24,
+        "resumeUnit": "hours",
+        "options": {
+          "ignoreBots": true,
+          "responseData": "Decision recorded. You can close this tab."
+        }
+      },
+      "id": "4608c817-82d6-5e54-9962-958da85b83fb",
+      "name": "Wait for reviewer",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4220,
+        40
+      ],
+      "webhookId": "a4aa7383-9212-55dd-856b-fb38260dd9bd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "72786fdb-8df0-54e8-8d8b-96e7f1d0858a",
+              "leftValue": "={{ $json.query ? $json.query.action : \"\" }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "approve"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ce442be8-5cac-5cf9-9dcb-0c07426a92d5",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4460,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $('Build approval message').first().json;\nconst action = $json.query && $json.query.action;\nreturn [{ json: { ...s, kind: action === 'reject' ? 'rejected' : 'expired', reviewer_decision: { action: action || 'timeout', at: new Date().toISOString() } } }];\n"
+      },
+      "id": "890ffb3f-1f7f-5932-ab76-6731d6df52ed",
+      "name": "Reviewer said no / timed out",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4700,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the exact Graph API call. In simulation mode this is logged instead of sent.\n// After the approval wait, the item is the reviewer's click, so the run state comes from \"Build approval message\".\nconst s = $json.post_text ? $json : $('Build approval message').first().json;\nconst decision = $json.query ? { action: $json.query.action, at: new Date().toISOString() } : null;\nconst c = s.cfg;\nconst endpoint = `https://graph.facebook.com/${c.fb_graph_version}/${c.fb_page_id}/${s.page.image_url ? 'photos' : 'feed'}`;\nconst params = s.page.image_url\n  ? { url: s.page.image_url, caption: s.post_text }           // photo post: image + caption (caption carries the link)\n  : { message: s.post_text, link: s.page.canonical_url };     // link post: Facebook builds the preview card\nif (c.schedule_minutes_ahead >= 15) {\n  params.published = false;\n  params.scheduled_publish_time = Math.floor(Date.now() / 1000) + c.schedule_minutes_ahead * 60;\n}\nconst fb_request = { method: 'POST', endpoint, params, auth: 'access_token=<TEST page token from the n8n credential, never logged>' };\nconst { discord_content, ...rest } = s;\nreturn [{ json: { ...rest, reviewer_decision: decision, fb_request } }];\n"
+      },
+      "id": "163cf9f5-bb7b-5599-b9fd-d5b866504485",
+      "name": "Build FB request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4700,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "02b31f61-24ad-5ba2-9a36-4cadd63facf9",
+              "leftValue": "={{ $json.cfg.publish_mode }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "live"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "e6892c55-f932-52eb-9317-4bd8ba88c313",
+      "name": "Publish live?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4940,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.fb_request.endpoint }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.fb_request.params) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "73e07027-2034-568f-8fc5-b408b9bfb954",
+      "name": "Facebook: publish to TEST page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5180,
+        140
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - FB TEST page token"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "06b01a0e-13d1-5581-9bd2-81ae9417407d",
+              "leftValue": "={{ (() => { const e = $json.error || {}; const c = Number(e.httpCode || (String(e.message || \"\").match(/\\b([45]\\d\\d)\\b/) || [])[1] || 0); return c === 0 || c >= 500; })() }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "82e02075-26e9-57bd-8fc0-d3f62e27ec76",
+      "name": "Facebook: retry once?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5180,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "200c8dd1-fc28-5575-a657-70b0a93fb548",
+      "name": "Facebook: wait 5 s before the one retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5420,
+        -60
+      ],
+      "webhookId": "b687d40d-9c92-509d-bf12-45888ac3946e"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Build FB request').first().json.fb_request.endpoint }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build FB request').first().json.fb_request.params) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "fe3f424c-35de-5972-b6fa-1674a843d4e8",
+      "name": "Facebook: retry (network error / 5xx only)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5660,
+        -60
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - FB TEST page token"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $('Build FB request').first().json;\nconst r = $input.first().json;\nconst scheduled = s.fb_request.params.published === false;\nreturn [{ json: { ...s, kind: 'success', fb_status: scheduled ? 'scheduled' : 'published', fb_post_id: r.post_id || r.id || null, fb_response: r } }];\n"
+      },
+      "id": "0ba944eb-b371-5090-af0e-c68912236ad6",
+      "name": "Read FB response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5420,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulation: nothing leaves the building. Record exactly what would have been sent.\nconst s = $input.first().json;\nreturn [{ json: { ...s, kind: 'success', fb_status: 'simulated', fb_post_id: `SIMULATED-${s.run_id}`, fb_response: { simulated: true, would_send: s.fb_request } } }];\n"
+      },
+      "id": "fe452d17-571f-553b-9dc5-b4796499d64c",
+      "name": "Simulate publish (log request only)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5300,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Every failure lands here: from a node's error output, or from the Error Trigger (anything unexpected).\nconst j = $input.first().json;\nconst fromErrorTrigger = !!(j.execution && j.workflow);\nconst stage = fromErrorTrigger ? (j.execution.lastNodeExecuted || 'unknown') : $prevNode.name;\nconst e = fromErrorTrigger ? j.execution.error : j.error;\nconst msg = typeof e === 'string' ? e : (e && [e.message, e.description].filter(Boolean).join(' / ')) || JSON.stringify(e || j).slice(0, 300);\nconst detail = JSON.stringify(e || {}).slice(0, 600);\nconst hay = (msg + ' ' + detail).toLowerCase();\nlet cause = 'unexpected error', hint = 'Open the execution in n8n and check the failed node.';\nif (/facebook/i.test(stage) && /(190|oauth|access token|session has expired|invalid token|authorization failed)/.test(hay)) {\n  cause = 'Facebook token expired or invalid'; hint = 'Create a new Page access token for the TEST page and paste it into the credential \"PlacidWay assessment - FB TEST page token\". Nothing was posted.';\n} else if (/facebook/i.test(stage)) {\n  cause = 'Facebook Graph API error'; hint = 'Not retried on 4xx; one retry only after a network error or 5xx. Check the page id, token permissions (pages_manage_posts) and the error text.';\n} else if (/llm|anthropic/i.test(stage) || /anthropic/.test(hay)) {\n  cause = /401|invalid x-api-key|authentication_error/.test(hay) ? 'LLM API key rejected' : /invalid_request_error|\\b400\\b/.test(hay) ? 'LLM request rejected (bad request)' : 'LLM API error (rate limit, overload or timeout)';\n  hint = 'Retried 3 times, 5 s apart. Tomorrow\\'s run will try again; check the Anthropic key/credits if it repeats.';\n} else if (/\\[robots\\]/.test(hay)) {\n  cause = 'blocked by robots.txt'; hint = 'The workflow refused to fetch a disallowed URL. Nothing to fix unless the URL is wrong.';\n} else if (/\\[site\\]/.test(hay)) {\n  cause = 'PlacidWay site unreachable'; hint = 'Retried with backoff (429/5xx/network only) and tried the archive copy. Tomorrow\\'s run will try again.';\n} else if (/\\[select\\]/.test(hay)) {\n  cause = 'nothing new to post'; hint = 'The URL was used before, or every URL of today\\'s content type is used. Dedupe held; rotation moves on tomorrow.';\n} else if (/discord/i.test(stage)) {\n  cause = 'could not reach the reviewer channel'; hint = 'Check the Discord webhook credential.';\n}\n// Recover whatever run state exists so the log row still says which item and which draft were involved.\nlet state = {};\nfor (const n of ['Combine verdicts', 'Rule check', 'Parse draft', 'Fetch page + extract', 'Pick today\\'s item', 'Read robots.txt', 'Config']) {\n  try { const j = $(n).last().json; if (j && j.cfg) { state = j; break; } } catch (err) {}\n}\nif (fromErrorTrigger) { state.run_id = String(j.execution.id || ''); state.trigger = state.trigger || j.execution.mode || 'error trigger'; }\nreturn [{ json: { ...state, kind: 'failure', failure: { stage, cause, hint, message: msg.slice(0, 500), via: fromErrorTrigger ? 'error trigger' : 'error output' } } }];\n"
+      },
+      "id": "f1dbdffc-c3cb-5a0e-a29a-1c9d30aeadf8",
+      "name": "Describe failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        1000
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "cba90301-e8bc-5b5d-beb8-c8c8828dc231",
+      "name": "On unexpected error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        2960,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One exit for every outcome: build the log row, the \"remember this URL\" row, and the Discord line.\nconst s = $input.first().json;\nconst c = s.cfg || {};\nconst p = s.page || {};\nlet kind = s.kind || (s.guardrail && !s.guardrail.pass ? 'blocked' : 'failure');\nconst status = kind === 'success' ? s.fb_status : kind;   // simulated | published | scheduled | blocked | rejected | expired | failure\nconst execUrl = `${c.n8n_base_url || ''}/workflow/${$workflow.id}/executions/${s.run_id || $execution.id}`;\nconst issues = (s.guardrail && s.guardrail.issues) || [];\nconst row = {\n  run_id: String(s.run_id || $execution.id), started_at: s.started_at || '', trigger: s.trigger || '',\n  review_mode: c.review_mode || '', publish_mode: c.publish_mode || '', content_type: c.content_type || '',\n  url: p.canonical_url || '', title: (p.title || '').slice(0, 300), image_url: p.image_url || '',\n  fetch_source: p.fetch_source ? `${p.fetch_source}${p.snapshot ? ' ' + p.snapshot : ''}` : '',\n  post_text: s.post_text || '',\n  rule_check: s.rule_check ? JSON.stringify(s.rule_check) : '', llm_check: s.llm_check ? JSON.stringify(s.llm_check) : '',\n  attempts: s.attempt || 0, fb_request: s.fb_request ? JSON.stringify(s.fb_request) : '',\n  fb_post_id: s.fb_post_id || '', status,\n  error: s.failure ? `${s.failure.stage}: ${s.failure.cause}: ${s.failure.message}` : (kind === 'blocked' ? issues.map((i) => `[${i.by}/${i.type}] ${i.quote || ''}`).join('; ').slice(0, 900) : ''),\n  finished_at: new Date().toISOString(),\n};\n// Never offer the same URL twice: remember it once it was posted, simulated, blocked twice, or rejected by a human.\n// A block caused only by a formatting slip (bad JSON) does not burn the URL; a block for content reasons does.\nconst contentBlock = status === 'blocked' && issues.some((i) => !['format', 'checker_error'].includes(i.type));\nconst remember = (['simulated', 'published', 'scheduled', 'rejected'].includes(status) || contentBlock) && row.url;\nconst posted = remember ? { url: row.url, content_type: row.content_type, title: row.title, status, run_id: row.run_id } : null;\nconst quote = (t) => (t || '').split('\\n').map((l) => '> ' + l).join('\\n');\nlet discord;\nif (kind === 'success') discord = `**PlacidWay daily post: ${status.toUpperCase()}** (run ${row.run_id}, ${c.content_type}, ${c.review_mode} mode)\\nSource: <${row.url}>\\nFacebook post id: ${row.fb_post_id}\\n\\n${quote(row.post_text)}`;\nelse if (kind === 'blocked') discord = `**ALERT: PlacidWay post BLOCKED by guardrails** after ${s.attempt} attempts (run ${row.run_id}). Nothing was posted.\\nSource: <${row.url}>\\nIssues:\\n${issues.slice(0, 8).map((i) => `- [${i.by}/${i.type}] \"${i.quote || ''}\" ${i.reason}`).join('\\n')}\\nExecution: <${execUrl}>`;\nelse if (kind === 'rejected' || kind === 'expired') discord = `PlacidWay post ${kind === 'rejected' ? 'REJECTED by the reviewer' : 'EXPIRED (no decision in time)'} (run ${row.run_id}). Nothing was posted.\\nSource: <${row.url}>`;\nelse discord = `**ALERT: PlacidWay workflow FAILED** (run ${row.run_id}, ${row.trigger || 'unknown'} trigger)\\nStage: ${s.failure.stage}\\nCause: ${s.failure.cause}\\nError: ${s.failure.message.slice(0, 300)}\\nWhat happens / what to do: ${s.failure.hint}\\nExecution: <${execUrl}>`;\nif (discord.length > 1990) discord = discord.slice(0, 1985) + '...';\nreturn [{ json: { row, posted, remember: !!posted, discord } }];\n"
+      },
+      "id": "4db18dd0-10c2-5b64-ab0f-bba4a77e4edd",
+      "name": "Finalize run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_ID_OF_pw_run_log",
+          "cachedResultName": "pw_run_log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.row.run_id }}",
+            "started_at": "={{ $json.row.started_at }}",
+            "trigger": "={{ $json.row.trigger }}",
+            "review_mode": "={{ $json.row.review_mode }}",
+            "publish_mode": "={{ $json.row.publish_mode }}",
+            "content_type": "={{ $json.row.content_type }}",
+            "url": "={{ $json.row.url }}",
+            "title": "={{ $json.row.title }}",
+            "image_url": "={{ $json.row.image_url }}",
+            "fetch_source": "={{ $json.row.fetch_source }}",
+            "post_text": "={{ $json.row.post_text }}",
+            "rule_check": "={{ $json.row.rule_check }}",
+            "llm_check": "={{ $json.row.llm_check }}",
+            "attempts": "={{ $json.row.attempts }}",
+            "fb_request": "={{ $json.row.fb_request }}",
+            "fb_post_id": "={{ $json.row.fb_post_id }}",
+            "status": "={{ $json.row.status }}",
+            "error": "={{ $json.row.error }}",
+            "finished_at": "={{ $json.row.finished_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "started_at",
+              "displayName": "started_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "trigger",
+              "displayName": "trigger",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "review_mode",
+              "displayName": "review_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_mode",
+              "displayName": "publish_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_url",
+              "displayName": "image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fetch_source",
+              "displayName": "fetch_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "post_text",
+              "displayName": "post_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "rule_check",
+              "displayName": "rule_check",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "llm_check",
+              "displayName": "llm_check",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fb_request",
+              "displayName": "fb_request",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fb_post_id",
+              "displayName": "fb_post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "finished_at",
+              "displayName": "finished_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f5712137-5fbb-574c-bd81-5fc2752c320d",
+      "name": "Log run",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        6020,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{ $json.discord }}",
+        "options": {}
+      },
+      "id": "af0e79af-d910-5fd5-aefb-ffed195b9d83",
+      "name": "Discord: notify",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        6020,
+        280
+      ],
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "PlacidWay assessment - Discord webhook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6af14485-cafc-565e-86db-e023a1793967",
+              "leftValue": "={{ $json.remember }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ec250185-5304-5988-a0fa-c86fc8de6d46",
+      "name": "Remember URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6020,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_ID_OF_pw_posted_urls",
+          "cachedResultName": "pw_posted_urls"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ $json.posted.url }}",
+            "content_type": "={{ $json.posted.content_type }}",
+            "title": "={{ $json.posted.title }}",
+            "status": "={{ $json.posted.status }}",
+            "run_id": "={{ $json.posted.run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "a4cad482-e969-53b9-980c-6603ef99fcb9",
+      "name": "Remember URL (never repeat)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        6260,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "placidway-assessment/dashboard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c15e0e79-41fe-5751-87ca-4684fd7d0877",
+      "name": "Dashboard (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1300
+      ],
+      "webhookId": "df8192c6-5287-5503-8123-42bd9960ccda"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_ID_OF_pw_run_log",
+          "cachedResultName": "pw_run_log"
+        },
+        "returnAll": true
+      },
+      "id": "ee4088b5-6b55-5c50-8553-c181b5dd8f44",
+      "name": "Get run log",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        1300
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stretch goal: a read-only dashboard of every run, straight from the run log table.\nconst rows = $input.all().map((i) => i.json).filter((r) => r.run_id).sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)));\nconst esc = (t) => String(t ?? '').replace(/[&<>\"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[ch]));\nconst counts = rows.reduce((m, r) => ((m[r.status] = (m[r.status] || 0) + 1), m), {});\nconst tr = rows.map((r) => `<tr><td>${esc((r.started_at || '').replace('T', ' ').slice(0, 16))}</td><td>${esc(r.trigger)}</td><td>${esc(r.content_type)}</td>\n<td><a href=\"${esc(r.url)}\">${esc(r.title || r.url)}</a></td><td><span class=\"s ${esc(r.status)}\">${esc(r.status)}</span></td><td>${esc(r.fb_post_id)}</td>\n<td>${esc(r.review_mode)}/${esc(r.publish_mode)}</td><td>${esc(r.attempts)}</td><td><details><summary>post</summary><pre>${esc(r.post_text)}</pre>${r.error ? `<p class=\"err\">${esc(r.error)}</p>` : ''}</details></td></tr>`).join('');\nconst html = `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>PlacidWay post runs</title>\n<style>:root{--bg:#fff;--fg:#14202b;--mut:#5b6b78;--line:#e3e8ec}@media (prefers-color-scheme:dark){:root{--bg:#0f1720;--fg:#e6edf3;--mut:#9fb0bf;--line:#253240}}\nbody{background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif;margin:0;padding:16px}h1{font-size:20px;margin:0 0 4px}p.m{color:var(--mut);margin:0 0 12px}\n.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:860px}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}\nth{font-size:12px;color:var(--mut);text-transform:uppercase}a{color:#0a7bbf}pre{white-space:pre-wrap;max-width:420px;font:12px/1.4 ui-monospace,monospace}\n.s{padding:1px 8px;border-radius:10px;font-size:12px;background:#e8eef3;color:#14202b}.simulated,.published,.scheduled{background:#d7f5df}.blocked,.failure{background:#fbdada}.rejected,.expired{background:#fdf0c8}.err{color:#c0392b}</style></head>\n<body><h1>PlacidWay daily post: run log</h1><p class=\"m\">${rows.length} runs. ${Object.entries(counts).map(([k, v]) => `${esc(k)}: ${v}`).join(' | ')}. Source: n8n data table pw_run_log.</p>\n<div class=\"wrap\"><table><thead><tr><th>Started (UTC)</th><th>Trigger</th><th>Type</th><th>Source page</th><th>Status</th><th>FB post id</th><th>Mode</th><th>Tries</th><th>Post</th></tr></thead><tbody>${tr}</tbody></table></div></body></html>`;\nreturn [{ json: { html } }];\n"
+      },
+      "id": "03313706-5586-57c0-a999-1ce33e7230b3",
+      "name": "Render dashboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "9b468714-f9ce-5ceb-837c-763cadf823b3",
+      "name": "Respond with HTML",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared-secret check for the dashboard URL (?k=...). The key is a static value in this node; the exported workflow.json carries a placeholder instead.\nconst KEY = 'REPLACE_WITH_YOUR_DASHBOARD_KEY';\nconst given = String(($input.first().json.query || {}).k || '');\nlet diff = given.length ^ KEY.length;\nfor (let i = 0; i < KEY.length; i++) diff |= (given.charCodeAt(i) || 0) ^ KEY.charCodeAt(i);\nreturn [{ json: { key_ok: diff === 0 } }];\n"
+      },
+      "id": "ebcd972d-2af6-5f67-b27d-a3543159bdd1",
+      "name": "Check dashboard key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "64601f89-ea51-5e4a-a234-aacb31c6413e",
+              "leftValue": "={{ $json.key_ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a2c36436-c79a-59f3-b2ac-9540d6c18082",
+      "name": "Key valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Not authorised",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "ec1e2a10-818d-51d2-9ab7-12c110b83f54",
+      "name": "Respond: not authorised",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        1460
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 09:00 (Asia/Manila)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test run (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read robots.txt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read robots.txt": {
+      "main": [
+        [
+          {
+            "node": "Get used URLs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get used URLs": {
+      "main": [
+        [
+          {
+            "node": "Pick today's item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick today's item": {
+      "main": [
+        [
+          {
+            "node": "Fetch page + extract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch page + extract": {
+      "main": [
+        [
+          {
+            "node": "Build draft request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build draft request": {
+      "main": [
+        [
+          {
+            "node": "LLM: write post (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: write post (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Parse draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse draft": {
+      "main": [
+        [
+          {
+            "node": "Rule check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rule check": {
+      "main": [
+        [
+          {
+            "node": "Build check request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build check request": {
+      "main": [
+        [
+          {
+            "node": "LLM: guardrail check (Sonnet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: guardrail check (Sonnet)": {
+      "main": [
+        [
+          {
+            "node": "Combine verdicts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine verdicts": {
+      "main": [
+        [
+          {
+            "node": "Passed both guardrails?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Passed both guardrails?": {
+      "main": [
+        [
+          {
+            "node": "Approval mode?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rewrite allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rewrite allowed?": {
+      "main": [
+        [
+          {
+            "node": "Build draft request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval mode?": {
+      "main": [
+        [
+          {
+            "node": "Build approval message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build FB request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build approval message": {
+      "main": [
+        [
+          {
+            "node": "Discord: send draft for approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord: send draft for approval": {
+      "main": [
+        [
+          {
+            "node": "Wait for reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for reviewer": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Build FB request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reviewer said no / timed out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook: publish to TEST page": {
+      "main": [
+        [
+          {
+            "node": "Read FB response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Facebook: retry once?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook: retry once?": {
+      "main": [
+        [
+          {
+            "node": "Facebook: wait 5 s before the one retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook: wait 5 s before the one retry": {
+      "main": [
+        [
+          {
+            "node": "Facebook: retry (network error / 5xx only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook: retry (network error / 5xx only)": {
+      "main": [
+        [
+          {
+            "node": "Read FB response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build FB request": {
+      "main": [
+        [
+          {
+            "node": "Publish live?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish live?": {
+      "main": [
+        [
+          {
+            "node": "Facebook: publish to TEST page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Simulate publish (log request only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On unexpected error": {
+      "main": [
+        [
+          {
+            "node": "Describe failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read FB response": {
+      "main": [
+        [
+          {
+            "node": "Finalize run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate publish (log request only)": {
+      "main": [
+        [
+          {
+            "node": "Finalize run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reviewer said no / timed out": {
+      "main": [
+        [
+          {
+            "node": "Finalize run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Describe failure": {
+      "main": [
+        [
+          {
+            "node": "Finalize run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize run": {
+      "main": [
+        [
+          {
+            "node": "Log run",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Discord: notify",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Remember URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remember URL?": {
+      "main": [
+        [
+          {
+            "node": "Remember URL (never repeat)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dashboard (GET)": {
+      "main": [
+        [
+          {
+            "node": "Check dashboard key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check dashboard key": {
+      "main": [
+        [
+          {
+            "node": "Key valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Key valid?": {
+      "main": [
+        [
+          {
+            "node": "Get run log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: not authorised",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get run log": {
+      "main": [
+        [
+          {
+            "node": "Render dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render dashboard": {
+      "main": [
+        [
+          {
+            "node": "Respond with HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true
+  },
+  "meta": {
+    "note": "PlacidWay take-home (Aaron Cabantugan). Import, create the 4 credentials and 2 data tables named in README, then set the Error Workflow setting to this workflow."
+  }
+}
